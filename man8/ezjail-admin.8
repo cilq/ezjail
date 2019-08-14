@@ -6,7 +6,7 @@
 .Nd Administrate ezjail environment
 .Sh SYNOPSIS
 .Nm Cm install
-.Op Fl mMpPsS
+.Op Fl mMpPsSK
 .Op Fl h Ar host
 .Op Fl r Ar release
 .Nm
@@ -123,6 +123,9 @@ for details or
 .Xr portsnap 8 .
 .It Fl P
 Fetch and extract a ports tree, without (re)installing the base jail.
+.It Fl K
+Reinstall the base jail and the new jail template. Can be used together with -r
+to upgrade both to a newer FreeBSD version.
 .It Fl h Ar host
 Set the remote host to fetch FreeBSD distribution sets from. If absent the
 default host

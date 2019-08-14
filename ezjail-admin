@@ -42,7 +42,7 @@ case `uname -p` in amd64) ezjail_dirlist="${ezjail_dirlist} usr/lib32"; ezjail_b
 
 # Synopsis messages
 ezjail_usage_ezjailadmin="${ezjail_admin} v3.4.2\nUsage: ${ezjail_admin} [archive|config|console|create|delete|freeze|install|list|restore|snapshot|troubleshoot|update] {params}"
-ezjail_usage_install="Usage: ${ezjail_admin} install [-mMpPsS] [-h host] [-r release]"
+ezjail_usage_install="Usage: ${ezjail_admin} install [-mMpPsSK] [-h host] [-r release]"
 ezjail_usage_create="Usage: ${ezjail_admin} create [-xbi] [-f flavour] [-r jailroot] [-s size] [-c bde|eli|zfs] [-C args] [-a archive] [-z parentzfs] jailname jailip"
 ezjail_usage_delete="Usage: ${ezjail_admin} delete [-wf] jailname"
 ezjail_usage_update="Usage: ${ezjail_admin} update [-s sourcetree|sourceosversion] [-p] (-b|-i|-u|-U|-P)"
@@ -286,7 +286,7 @@ ezjail_splitworld() {
   # directories with permission 0700 which is bad
   mkdir -p "${ezjail_jailbase}/usr"
   for dir in ${ezjail_dirlist}; do
-    find ${dir} | cpio -d -p -v "${ezjail_jailbase}" || exerr "Error: Installation of ${dir} failed."
+    find ${dir} | cpio -d -p -v ${ezjail_keep_basejail} "${ezjail_jailbase}" || exerr "Error: Installation of ${dir} failed."
     chflags -R noschg ${dir}; rm -r ${dir}; ln -s /basejail/${dir} ${dir}
   done
   mkdir basejail
@@ -1067,7 +1067,7 @@ install)
   # Clean variables, prevent pollution
   unset ezjail_release ezjail_installmanpages ezjail_installports ezjail_installsources ezjail_dir ezjail_ftpserverqueried ezjail_proto ezjail_disturi
 
-  shift; while getopts :mMpPsSh:r: arg; do case ${arg} in
+  shift; while getopts :mMpPsSh:Kr: arg; do case ${arg} in
     m) ezjail_installmanpages=" manpages";;
     M) ezjail_installmanpages=" manpages"; unset ezjail_basesystem;;
     s) ezjail_installsources=" src";;
@@ -1075,6 +1075,7 @@ install)
     p) ezjail_installports="YES";;
     P) ezjail_installports="YES"; unset ezjail_basesystem;;
     h) ezjail_ftphost=${OPTARG};;
+    K) ezjail_keep_basejail="-u";;
     r) ezjail_release=${OPTARG};;
     ?) exerr ${ezjail_usage_install};;
   esac; done; shift $(( ${OPTIND} - 1 ))
