@@ -285,7 +285,10 @@ ezjail_splitworld() {
   # This mkdir is important, since cpio will create intermediate
   # directories with permission 0700 which is bad
   mkdir -p "${ezjail_jailbase}/usr"
+  # Remove any leftover ezjail install logs
+  rm -f ${ezjail_jailbase}/.ezjail.installlog
   for dir in ${ezjail_dirlist}; do
+    find ${dir} >> ${ezjail_jailbase}/.ezjail.installlog
     find ${dir} | cpio -d -p -v ${ezjail_keep_basejail} "${ezjail_jailbase}" || exerr "Error: Installation of ${dir} failed."
     chflags -R noschg ${dir}; rm -r ${dir}; ln -s /basejail/${dir} ${dir}
   done
