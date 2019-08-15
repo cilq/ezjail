@@ -61,6 +61,9 @@
 .Op Fl s Ar sourcetree | sourceosversion
 .Op Fl p
 .Fl b | Fl i | Fl P | Fl u | Fl U
+.Nm
+.Cm baseclean
+.Op Fl y
 .Sh DESCRIPTION
 The
 .Nm
@@ -629,6 +632,17 @@ sub command to install the basejail from binary packages.
 .Pp
 If the basejail is managed in its own ZFS filesystem, a snapshot of that
 filesystem is taken first.
+.Ss Nm Cm baseclean
+Cleans ezjail's basejail from any unneeded files that might still be present
+after an upgrade via
+.Cm ezjail-admin install
+.Fl K
+.Pp
+Defaults in a dry run which
+will not delete anything, but shows all files that would be deleted.
+.Pp
+.Fl y
+Really delete that files.
 .Sh FILES
 .Pa EZJAIL_PREFIX/bin/ezjail-admin
 .br

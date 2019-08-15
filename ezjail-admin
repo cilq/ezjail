@@ -41,7 +41,7 @@ ezjail_basesystem="base"
 case `uname -p` in amd64) ezjail_dirlist="${ezjail_dirlist} usr/lib32"; ezjail_basesystem="${ezjail_basesystem} lib32";; esac
 
 # Synopsis messages
-ezjail_usage_ezjailadmin="${ezjail_admin} v3.4.2\nUsage: ${ezjail_admin} [archive|config|console|create|delete|freeze|install|list|restore|snapshot|troubleshoot|update] {params}"
+ezjail_usage_ezjailadmin="${ezjail_admin} v3.4.2\nUsage: ${ezjail_admin} [archive|config|console|create|delete|freeze|install|list|restore|snapshot|troubleshoot|update|baseclean] {params}"
 ezjail_usage_install="Usage: ${ezjail_admin} install [-mMpPsSK] [-h host] [-r release]"
 ezjail_usage_create="Usage: ${ezjail_admin} create [-xbi] [-f flavour] [-r jailroot] [-s size] [-c bde|eli|zfs] [-C args] [-a archive] [-z parentzfs] jailname jailip"
 ezjail_usage_delete="Usage: ${ezjail_admin} delete [-wf] jailname"
@@ -53,6 +53,7 @@ ezjail_usage_restore="Usage: ${ezjail_admin} restore [-f] [-d archivedir] (archi
 ezjail_usage_freeze="Usage: ${ezjail_admin} freeze jailname newflavour"
 ezjail_usage_troubleshoot="Usage: ${ezjail_admin} troubleshoot [jailname...]"
 ezjail_usage_list="Usage: ${ezjail_admin} list"
+ezjail_usage_baseclean="Usage: ${ezjail_admin} baseclean [-y]"
 
 ################################
 # End of variable initialization
@@ -1217,6 +1218,60 @@ install)
   # Fill ports, if requested
   [ "${ezjail_installports}" ] && ezjail_updateports
 
+  ;;
+######################## ezjail-admin BASECLEAN ########################
+baseclean)
+  unset ezjail_yeswecan
+
+  shift; while getopts y arg; do case ${arg} in
+    y) ezjail_yeswecan="YES";;
+    ?) exerr ${ezjail_usage_baseclean};;
+  esac; done; shift $(( $OPTIND - 1 ))
+
+  [ "${ezjail_yeswecan}" != "YES" ] && echo "baseclean dry run, nothing will be deleted. Use -y option to delete files."
+
+  [ "${ezjail_use_zfs}" = "YES" ] && ensure_jailzfs
+  ezjail_makeabsolute ezjail_jailtemp
+  rm -rf "${ezjail_jailtemp}"
+
+  # Create and try to access temp dir
+  mkdir -p "${ezjail_jailtemp}" || exerr "Error: Could not create temporary base jail directory ${ezjail_jailtemp}."
+
+  # create any directories in install log
+  for line in `cat ${ezjail_jailbase}/.ezjail.installlog | sort`; do
+   [ ! -d "${ezjail_jailtemp}/${line%/*}" ] && mkdir -p "${ezjail_jailtemp}/${line%/*}"
+  done
+
+  # we ignore any usr/ports and the ezjail install log itself
+  mkdir -p "${ezjail_jailtemp}/usr/ports"
+  touch "${ezjail_jailtemp}/.ezjail.installlog"
+
+  # touch any files listed in install log
+  for line in `cat ${ezjail_jailbase}/.ezjail.installlog | sort`; do
+   [ ! -e "${ezjail_jailtemp}/${line}" ] && touch "${ezjail_jailtemp}/${line}"
+  done
+
+  # User has enabled uglyperlhack in ezjail.conf, make sure symlink doesn't get deleted
+  [ "${ezjail_uglyperlhack}" = "YES" ] && touch "${ezjail_jailtemp}/usr/bin/perl"
+
+  # find all files in base jail that are not listed in the install log and delete them
+  for _file in `find ${ezjail_jailbase} -type l -or -type f ! -regex ".*usr/ports.*" | sed s:^${ezjail_jailbase}/:: `; do
+   if [ ! -f "${ezjail_jailtemp}/${_file}" ]; then
+    [ "${ezjail_yeswecan}" != "YES" ] && echo "File: ${ezjail_jailbase}/${_file} will be deleted"
+    [ "${ezjail_yeswecan}" = "YES" ] && rm "${ezjail_jailbase}/${_file}" && echo "File: ${ezjail_jailbase}/${_file} deleted"
+   fi
+  done
+
+  # find all directories in base jail that are not listed in the install log and delete them when empty
+  for _dir in `find ${ezjail_jailbase} -type d ! -regex ".*usr/ports.*" | sort -r | sed -E s:^${ezjail_jailbase}:: `; do
+   if [ ! -e "${ezjail_jailtemp}/${_dir}" ]; then
+    [ "${ezjail_yeswecan}" != "YES" ] && echo "Dir: ${ezjail_jailbase}/${_dir} will be deleted"
+    [ "${ezjail_yeswecan}" = "YES" ] && rmdir ${ezjail_jailbase}/${_dir} && echo "Dir: ${ezjail_jailbase}/${_dir} deleted"
+   fi
+  done
+
+  # remove our temporary directory
+  rm -rf "${ezjail_jailtemp}"
   ;;
 ######################## ezjail-admin SHORTCUT ########################
 *start|*stop|*startcrypto|*stopcrypto)
