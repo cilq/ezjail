@@ -293,6 +293,7 @@ ezjail_splitworld() {
     find ${dir} | cpio -d -p -v ${ezjail_keep_basejail} "${ezjail_jailbase}" || exerr "Error: Installation of ${dir} failed."
     chflags -R noschg ${dir}; rm -r ${dir}; ln -s /basejail/${dir} ${dir}
   done
+  [ "${ezjail_uglyperlhack}" = "YES" ] && echo usr/bin/perl >> ${ezjail_jailbase}/.ezjail.installlog
   mkdir basejail
 
   # Try to remove the old template jail
@@ -1232,47 +1233,27 @@ baseclean)
   [ ! -f "${ezjail_jailbase}/.ezjail.installlog" ] && echo "No .ezjail.installlog found in basejail, please run ezjail-admin install first." && exit 1
 
   [ "${ezjail_use_zfs}" = "YES" ] && ensure_jailzfs
-  ezjail_makeabsolute ezjail_jailtemp
-  rm -rf "${ezjail_jailtemp}"
+  ezjail_makeabsolute ezjail_jailbase
 
-  # Create and try to access temp dir
-  mkdir -p "${ezjail_jailtemp}" || exerr "Error: Could not create temporary base jail directory ${ezjail_jailtemp}."
+  for _parent in `ls -1d ${ezjail_jailbase}/*/* |grep -v ${ezjail_jailbase}/usr/ports`; do
 
-  # create any directories in install log
-  for line in `cat ${ezjail_jailbase}/.ezjail.installlog | sort`; do
-   [ ! -d "${ezjail_jailtemp}/${line%/*}" ] && mkdir -p "${ezjail_jailtemp}/${line%/*}"
+   # find all files in base jail that are not listed in the install log and delete them
+   for _file in `find ${_parent} -type l -or -type f | sed s:^${ezjail_jailbase}/:: `; do
+    if [ `grep --mmap -c -m 1 -F -x ${_file} ${ezjail_jailbase}/.ezjail.installlog` -lt 1 ]; then
+     [ "${ezjail_yeswecan}" != "YES" ] && echo "File: ${ezjail_jailbase}/${_file} will be deleted"
+     [ "${ezjail_yeswecan}" = "YES" ] && rm "${ezjail_jailbase}/${_file}" && echo "File: ${ezjail_jailbase}/${_file} deleted"
+    fi
+   done
+
+   # find all directories in base jail that are not listed in the install log and delete them when empty
+   for _dir in `find ${_parent} -type d | sort -r | sed -E s:^${ezjail_jailbase}/:: `; do
+    if [ `grep -c -m 1 -F -x ${_dir} ${ezjail_jailbase}/.ezjail.installlog` -lt 1 ]; then
+     [ "${ezjail_yeswecan}" != "YES" -a "${_dir}" != "${ezjail_jailbase}" ] && echo "Dir: ${ezjail_jailbase}/${_dir} will be deleted"
+     [ "${ezjail_yeswecan}" = "YES" -a "${_dir}" != "${ezjail_jailbase}" ] && rmdir ${ezjail_jailbase}/${_dir} && echo "Dir: ${ezjail_jailbase}/${_dir} deleted"
+    fi
+   done
   done
 
-  # we ignore any usr/ports and the ezjail install log itself
-  mkdir -p "${ezjail_jailtemp}/usr/ports"
-  touch "${ezjail_jailtemp}/.ezjail.installlog"
-
-  # touch any files listed in install log
-  for line in `cat ${ezjail_jailbase}/.ezjail.installlog | sort`; do
-   [ ! -e "${ezjail_jailtemp}/${line}" ] && touch "${ezjail_jailtemp}/${line}"
-  done
-
-  # User has enabled uglyperlhack in ezjail.conf, make sure symlink doesn't get deleted
-  [ "${ezjail_uglyperlhack}" = "YES" ] && touch "${ezjail_jailtemp}/usr/bin/perl"
-
-  # find all files in base jail that are not listed in the install log and delete them
-  for _file in `find ${ezjail_jailbase} -type l -or -type f ! -regex ".*usr/ports.*" | sed s:^${ezjail_jailbase}/:: `; do
-   if [ ! -f "${ezjail_jailtemp}/${_file}" ]; then
-    [ "${ezjail_yeswecan}" != "YES" ] && echo "File: ${ezjail_jailbase}/${_file} will be deleted"
-    [ "${ezjail_yeswecan}" = "YES" ] && rm "${ezjail_jailbase}/${_file}" && echo "File: ${ezjail_jailbase}/${_file} deleted"
-   fi
-  done
-
-  # find all directories in base jail that are not listed in the install log and delete them when empty
-  for _dir in `find ${ezjail_jailbase} -type d ! -regex ".*usr/ports.*" | sort -r | sed -E s:^${ezjail_jailbase}:: `; do
-   if [ ! -e "${ezjail_jailtemp}/${_dir}" ]; then
-    [ "${ezjail_yeswecan}" != "YES" ] && echo "Dir: ${ezjail_jailbase}/${_dir} will be deleted"
-    [ "${ezjail_yeswecan}" = "YES" ] && rmdir ${ezjail_jailbase}/${_dir} && echo "Dir: ${ezjail_jailbase}/${_dir} deleted"
-   fi
-  done
-
-  # remove our temporary directory
-  rm -rf "${ezjail_jailtemp}"
   ;;
 ######################## ezjail-admin SHORTCUT ########################
 *start|*stop|*startcrypto|*stopcrypto)
