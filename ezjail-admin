@@ -1229,6 +1229,7 @@ baseclean)
   esac; done; shift $(( $OPTIND - 1 ))
 
   [ "${ezjail_yeswecan}" != "YES" ] && echo "baseclean dry run, nothing will be deleted. Use -y option to delete files."
+  [ ! -f "${ezjail_jailbase}/.ezjail.installlog" ] && echo "No .ezjail.installlog found in basejail, please run ezjail-admin install first." && exit 1
 
   [ "${ezjail_use_zfs}" = "YES" ] && ensure_jailzfs
   ezjail_makeabsolute ezjail_jailtemp
